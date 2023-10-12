@@ -88,6 +88,7 @@ import {
 } from "./util/functionBinding.js";
 import { useProject } from "../project.js";
 import { VisibleError } from "../error.js";
+import { HttpsRedirect } from "./cdk/website-redirect.js";
 
 const __dirname = url.fileURLToPath(new URL(".", import.meta.url));
 
@@ -1078,7 +1079,7 @@ export abstract class SsrSite extends Construct implements SSTConstruct {
     });
 
     return {
-      viewerProtocolPolicy: ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
+      viewerProtocolPolicy: ViewerProtocolPolicy.ALLOW_ALL,
       origin: new HttpOrigin(Fn.parseDomainName(fnUrl.url), {
         readTimeout:
           typeof timeout === "string"
@@ -1118,7 +1119,7 @@ export abstract class SsrSite extends Construct implements SSTConstruct {
     const cfDistributionProps = cdk?.distribution || {};
 
     return {
-      viewerProtocolPolicy: ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
+      viewerProtocolPolicy: ViewerProtocolPolicy.ALLOW_ALL,
       origin: this.s3Origin,
       allowedMethods: AllowedMethods.ALLOW_ALL,
       cachedMethods: CachedMethods.CACHE_GET_HEAD_OPTIONS,
@@ -1157,7 +1158,7 @@ export abstract class SsrSite extends Construct implements SSTConstruct {
         isDir ? `${item}/*` : item,
         this.s3Origin,
         {
-          viewerProtocolPolicy: ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
+          viewerProtocolPolicy: ViewerProtocolPolicy.ALLOW_ALL,
           allowedMethods: AllowedMethods.ALLOW_GET_HEAD_OPTIONS,
           cachedMethods: CachedMethods.CACHE_GET_HEAD_OPTIONS,
           compress: true,

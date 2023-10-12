@@ -375,7 +375,7 @@ export class NextjsSite extends SsrSite {
     });
 
     return {
-      viewerProtocolPolicy: ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
+      viewerProtocolPolicy: ViewerProtocolPolicy.ALLOW_ALL,
       origin: new HttpOrigin(Fn.parseDomainName(imageFnUrl.url)),
       allowedMethods: AllowedMethods.ALLOW_ALL,
       cachedMethods: CachedMethods.CACHE_GET_HEAD_OPTIONS,
