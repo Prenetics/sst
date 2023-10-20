@@ -6,7 +6,7 @@
   },
   "sideEffects": false,
   "name": "@prenetics/sst",
-  "version": "2.25.10",
+  "version": "2.25.11",
   "bin": {
     "sst": "cli/sst.js"
   },

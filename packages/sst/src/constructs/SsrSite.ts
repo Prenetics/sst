@@ -1067,7 +1067,7 @@ export abstract class SsrSite extends Construct implements SSTConstruct {
   }
 
   protected buildDefaultBehaviorForRegional(): BehaviorOptions {
-    const { timeout, regional, cdk } = this.props;
+    const { timeout, regional, cdk, disableServerFunction } = this.props;
     const cfDistributionProps = cdk?.distribution || {};
 
     const fnUrl = this.serverLambdaForRegional!.addFunctionUrl({
@@ -1096,7 +1096,7 @@ export abstract class SsrSite extends Construct implements SSTConstruct {
       originRequestPolicy: this.useServerBehaviorOriginRequestPolicy(),
       ...(cfDistributionProps.defaultBehavior || {}),
       functionAssociations: [
-        ...this.useServerBehaviorFunctionAssociations(),
+        ...(disableServerFunction ? [] : this.useServerBehaviorFunctionAssociations()),
         ...(cfDistributionProps.defaultBehavior?.functionAssociations || []),
       ],
       edgeLambdas: [
