@@ -563,8 +563,8 @@ export class App extends CDKApp {
     fs.appendFileSync(
       `${typesPath}/index.ts`,
       [
-        `import "@alexabidri/sst/node/config";`,
-        `declare module "@alexabidri/sst/node/config" {`,
+        `import "@prenetics/sst/node/config";`,
+        `declare module "@prenetics/sst/node/config" {`,
         `  export interface ConfigTypes {`,
         `    APP: string;`,
         `    STAGE: string;`,
@@ -597,8 +597,8 @@ export class App extends CDKApp {
         `${typesPath}/index.ts`,
         (binding.variables[0] === "."
           ? [
-              `import "@alexabidri/sst/node/${binding.clientPackage}";`,
-              `declare module "@alexabidri/sst/node/${binding.clientPackage}" {`,
+              `import "@prenetics/sst/node/${binding.clientPackage}";`,
+              `declare module "@prenetics/sst/node/${binding.clientPackage}" {`,
               `  export interface ${className}Resources {`,
               `    "${id}": string;`,
               `  }`,
@@ -607,8 +607,8 @@ export class App extends CDKApp {
               ``,
             ]
           : [
-              `import "@alexabidri/sst/node/${binding.clientPackage}";`,
-              `declare module "@alexabidri/sst/node/${binding.clientPackage}" {`,
+              `import "@prenetics/sst/node/${binding.clientPackage}";`,
+              `declare module "@prenetics/sst/node/${binding.clientPackage}" {`,
               `  export interface ${className}Resources {`,
               `    "${id}": {`,
               ...binding.variables.map((p) => `      ${p}: string;`),

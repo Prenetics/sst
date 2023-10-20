@@ -202,6 +202,7 @@ export interface SsrSiteProps {
    * ```
    */
   permissions?: Permissions;
+  disableServerFunction?: boolean;
   /**
    * An object with the key being the environment variable name.
    *
@@ -1115,7 +1116,7 @@ export abstract class SsrSite extends Construct implements SSTConstruct {
   }
 
   protected buildDefaultBehaviorForEdge(): BehaviorOptions {
-    const { cdk } = this.props;
+    const { cdk, disableServerFunction } = this.props;
     const cfDistributionProps = cdk?.distribution || {};
 
     return {
@@ -1130,7 +1131,7 @@ export abstract class SsrSite extends Construct implements SSTConstruct {
       originRequestPolicy: this.useServerBehaviorOriginRequestPolicy(),
       ...(cfDistributionProps.defaultBehavior || {}),
       functionAssociations: [
-        ...this.useServerBehaviorFunctionAssociations(),
+        ...(disableServerFunction ? [] : this.useServerBehaviorFunctionAssociations()),
         ...(cfDistributionProps.defaultBehavior?.functionAssociations || []),
       ],
       edgeLambdas: [
