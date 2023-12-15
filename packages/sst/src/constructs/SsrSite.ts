@@ -92,8 +92,7 @@ import {
 } from "./util/functionBinding.js";
 import { useProject } from "../project.js";
 import { VisibleError } from "../error.js";
-import { RetentionDays } from "aws-cdk-lib/aws-logs";
-import { transformSync } from "esbuild";
+import { HttpsRedirect } from "./cdk/website-redirect.js";
 
 const __dirname = url.fileURLToPath(new URL(".", import.meta.url));
 
@@ -1282,16 +1281,9 @@ if (event.type === "warmer") {
       copy.forEach(({ cached, to, versionedSubDir }) => {
         if (!cached) return;
 
-        // Create a default file option for: unversioned files
-        fileOptions.push({
-          files: "**",
-          ignore: versionedSubDir
-            ? path.posix.join(to, versionedSubDir, "**")
-            : undefined,
-          cacheControl:
-            assets?.nonVersionedFilesCacheHeader ??
-            `public,max-age=0,s-maxage=${nonVersionedFilesTTL},stale-while-revalidate=${staleWhileRevalidateTTL}`,
-        });
+  protected buildDefaultBehaviorForRegional(): BehaviorOptions {
+    const { timeout, regional, cdk, disableServerFunction } = this.props;
+    const cfDistributionProps = cdk?.distribution || {};
 
         // Create a default file option for: versioned files
         if (versionedSubDir) {
@@ -1303,40 +1295,98 @@ if (event.type === "warmer") {
           });
         }
       });
+    
+    return {
+      viewerProtocolPolicy: ViewerProtocolPolicy.ALLOW_ALL,
+      origin: new HttpOrigin(Fn.parseDomainName(fnUrl.url), {
+        readTimeout:
+          typeof timeout === "string"
+            ? toCdkDuration(timeout)
+            : CdkDuration.seconds(timeout),
+      }),
+      allowedMethods: AllowedMethods.ALLOW_ALL,
+      cachedMethods: CachedMethods.CACHE_GET_HEAD_OPTIONS,
+      compress: true,
+      cachePolicy:
+        cdk?.serverCachePolicy ?? this.useServerBehaviorCachePolicy(),
+      responseHeadersPolicy: cdk?.responseHeadersPolicy,
+      originRequestPolicy: this.useServerBehaviorOriginRequestPolicy(),
+      ...(cfDistributionProps.defaultBehavior || {}),
+      functionAssociations: [
+        ...(disableServerFunction ? [] : this.useServerBehaviorFunctionAssociations()),
+        ...(cfDistributionProps.defaultBehavior?.functionAssociations || []),
+      ],
+      edgeLambdas: [
+        ...(regional?.enableServerUrlIamAuth
+          ? [
+              {
+                includeBody: true,
+                eventType: LambdaEdgeEventType.ORIGIN_REQUEST,
+                functionVersion:
+                  this.useServerUrlSigningFunction().currentVersion,
+              },
+            ]
+          : []),
+        ...(cfDistributionProps.defaultBehavior?.edgeLambdas || []),
+      ],
+    };
+  }
 
-      if (assets?.fileOptions) {
-        fileOptions.push(...assets.fileOptions);
-      }
+  protected buildDefaultBehaviorForEdge(): BehaviorOptions {
+    const { cdk, disableServerFunction } = this.props;
+    const cfDistributionProps = cdk?.distribution || {};
 
-      return fileOptions;
-    }
+    return {
+      viewerProtocolPolicy: ViewerProtocolPolicy.ALLOW_ALL,
+      origin: this.s3Origin,
+      allowedMethods: AllowedMethods.ALLOW_ALL,
+      cachedMethods: CachedMethods.CACHE_GET_HEAD_OPTIONS,
+      compress: true,
+      cachePolicy:
+        cdk?.serverCachePolicy ?? this.useServerBehaviorCachePolicy(),
+      responseHeadersPolicy: cdk?.responseHeadersPolicy,
+      originRequestPolicy: this.useServerBehaviorOriginRequestPolicy(),
+      ...(cfDistributionProps.defaultBehavior || {}),
+      functionAssociations: [
+        ...(disableServerFunction ? [] : this.useServerBehaviorFunctionAssociations()),
+        ...(cfDistributionProps.defaultBehavior?.functionAssociations || []),
+      ],
+      edgeLambdas: [
+        {
+          includeBody: true,
+          eventType: LambdaEdgeEventType.ORIGIN_REQUEST,
+          functionVersion: this.serverLambdaForEdge!.currentVersion,
+        },
+        ...(cfDistributionProps.defaultBehavior?.edgeLambdas || []),
+      ],
+    };
+  }
 
-    function getS3ContentReplaceValues() {
-      const replaceValues: SsrSiteReplaceProps[] = [];
+  protected addStaticFileBehaviors() {
+    const { cdk } = this.props;
 
-      Object.entries(environment || {})
-        .filter(([, value]) => Token.isUnresolved(value))
-        .forEach(([key, value]) => {
-          const token = `{{ ${key} }}`;
-          replaceValues.push(
-            {
-              files: "**/*.html",
-              search: token,
-              replace: value,
-            },
-            {
-              files: "**/*.js",
-              search: token,
-              replace: value,
-            },
-            {
-              files: "**/*.json",
-              search: token,
-              replace: value,
-            }
-          );
-        });
-      return replaceValues;
+    // Create a template for statics behaviours
+    const publicDir = path.join(
+      this.props.path,
+      this.buildConfig.clientBuildOutputDir
+    );
+    for (const item of fs.readdirSync(publicDir)) {
+      const isDir = fs.statSync(path.join(publicDir, item)).isDirectory();
+      (this.distribution.cdk.distribution as CdkDistribution).addBehavior(
+        isDir ? `${item}/*` : item,
+        this.s3Origin,
+        {
+          viewerProtocolPolicy: ViewerProtocolPolicy.ALLOW_ALL,
+          allowedMethods: AllowedMethods.ALLOW_GET_HEAD_OPTIONS,
+          cachedMethods: CachedMethods.CACHE_GET_HEAD_OPTIONS,
+          compress: true,
+          cachePolicy: CachePolicy.CACHING_OPTIMIZED,
+          responseHeadersPolicy: cdk?.responseHeadersPolicy,
+          functionAssociations: [
+            ...this.useStaticBehaviorFunctionAssociations(),
+          ],
+        }
+      );
     }
 
     function createDistributionInvalidation() {

@@ -817,28 +817,34 @@ if (event.rawPath) {
     server.role?.attachInlinePolicy(policy);
   }
 
-  private uploadSourcemaps() {
-    const stack = Stack.of(this);
-    const server = this.serverFunction as SsrFunction;
-
-    this.useRoutes().forEach(({ sourcemapPath, sourcemapKey }) => {
-      if (!sourcemapPath || !sourcemapKey) return;
-
-      useDeferredTasks().add(async () => {
-        // zip sourcemap
-        const zipPath = `${sourcemapPath}.gz.zip`;
-        const data = await fs.promises.readFile(sourcemapPath);
-        await fs.promises.writeFile(zipPath, zlib.gzipSync(data));
-        const asset = new Asset(this, `Sourcemap-${sourcemapKey}`, {
-          path: zipPath,
-        });
-
-        useFunctions().sourcemaps.add(stack.stackName, {
-          asset,
-          tarKey: path.join(server.functionArn, sourcemapKey),
-        });
-      });
-    });
+    return {
+      viewerProtocolPolicy: ViewerProtocolPolicy.ALLOW_ALL,
+      origin: new HttpOrigin(Fn.parseDomainName(imageFnUrl.url)),
+      allowedMethods: AllowedMethods.ALLOW_ALL,
+      cachedMethods: CachedMethods.CACHE_GET_HEAD_OPTIONS,
+      compress: true,
+      cachePolicy:
+        cdk?.serverCachePolicy ?? this.useServerBehaviorCachePolicy(),
+      responseHeadersPolicy: cdk?.responseHeadersPolicy,
+      edgeLambdas: regional?.enableServerUrlIamAuth
+        ? [
+            (() => {
+              const fn = this.useServerUrlSigningFunction();
+              fn.attachPermissions([
+                new PolicyStatement({
+                  actions: ["lambda:InvokeFunctionUrl"],
+                  resources: [imageFn.functionArn],
+                }),
+              ]);
+              return {
+                includeBody: true,
+                eventType: LambdaEdgeEventType.ORIGIN_REQUEST,
+                functionVersion: fn.currentVersion,
+              };
+            })(),
+          ]
+        : [],
+    };
   }
 
   private static buildCloudWatchRouteName(route: string) {
